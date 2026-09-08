@@ -1,7 +1,7 @@
-group: io.kestra.plugin.elasticsearch-lib
+group: io.kestra.plugin.elasticsearch.shared
 name: "elasticsearch-lib"
 title: "Elasticsearch Lib"
-description: "Elasticsearch Lib plugin for Kestra"
+description: "Shared kernel library for Kestra Elasticsearch plugins (OSS and EE)."
 body: ""
 videos: []
 createdBy: "Kestra Core Team"
