@@ -1,45 +1,20 @@
-# Kestra Elasticsearch Lib Plugin
+# AGENTS.md
 
 ## What
 
-- Provides plugin components under `io.kestra.plugin.elasticsearch-lib`.
-- Includes classes such as `Example`, `Trigger`.
+- Shared kernel library published as `io.kestra.plugin:plugin-elasticsearch-lib`, consumed by `plugin-elasticsearch` (OSS) and `plugin-ee-elasticsearch` (EE).
+- Provides classes under `io.kestra.plugin.elasticsearch.shared`: `ElasticsearchConnection` (hosts, basic auth, headers, TLS, `targetServerVersion` / compatibility headers) and `BulkService` (buffered bulk indexing with `requests.count` / `records` / `requests.duration` metrics).
 
 ## Why
 
-- What user problem does this solve? Teams need a concrete starting point for building and validating new Kestra plugins without recreating the same project scaffolding from scratch.
-- Why would a team adopt this plugin in a workflow? It gives plugin authors a ready-made reference repo they can adapt alongside their own build, test, and publishing workflow.
-- What operational/business outcome does it enable? It shortens plugin delivery time, reduces setup mistakes, and makes internal or partner plugin development more repeatable.
-
-## How
-
-### Architecture
-
-Single-module plugin. Source packages under `io.kestra.plugin`:
-
-- `elasticsearch-lib`
-
-Infrastructure dependencies (Docker Compose services):
-
-- `app`
-
-### Key Plugin Classes
-
-- `io.kestra.plugin.elasticsearch-lib.Example`
-
-### Project Structure
-
-```
-plugin-elasticsearch-lib/
-├── src/main/java/io/kestra/plugin/elasticsearch-lib/
-├── src/test/java/io/kestra/plugin/elasticsearch-lib/
-├── build.gradle
-└── README.md
-```
+- OSS and EE each shipped a near-verbatim copy of the connection-building and bulk-indexing code. This library removes that duplication so both consumers evolve the connection and bulk logic in one place instead of drifting apart.
 
 ## Local rules
 
-- Base the wording on the implemented packages and classes, not on template README text.
+- This library is shared between OSS and EE **only** — it is not a general-purpose Elasticsearch client wrapper. Do not add task/trigger classes, plugin docs, or plugin icons here; each consumer keeps its own.
+- It is a plain library, not a plugin: no `package-info.java` with `@PluginSubGroup`, no `shadowJar`, no `X-Kestra-*` jar manifest.
+- This library is the single source of the ES client version (`elasticsearchVersion` in its own `gradle.properties`); neither consumer declares it anymore. Both inherit it transitively through the `api` dependency, so bumping it here changes the `connection` schema for OSS and EE simultaneously — bump deliberately and QA both.
+- Preserve metric names (`requests.count`, `records`, `requests.duration`) and error message text byte-for-byte; both consumers' users template outputs and grep logs on these.
 
 ## References
 

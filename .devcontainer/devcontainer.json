@@ -5,7 +5,6 @@
     "dockerfile": "Dockerfile"
   },
   "workspaceFolder": "/workspaces/plugin-elasticsearch-lib",
-  "forwardPorts": [8080],
   "customizations": {
     "vscode": {
       "settings": {

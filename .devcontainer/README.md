@@ -21,21 +21,13 @@ NOTE: you'll need to wait for the gradle build to finish and compile Java files 
 
 ### Development:
 
-It is recommended to read the following plugin development guide so you can better understand how to get started with plugin development: https://kestra.io/docs/plugin-developer-guide.
+It is recommended to read the following plugin development guide so you can better understand the conventions this library follows: https://kestra.io/docs/plugin-developer-guide.
 
-The next step is to run docker compose as this will build a custom Kestra image for you and also map the plugins folder to the local Kestra instance. There is also a volume mount so any changes to the plugin source code will reflect inside the local Kestra instance giving you a good development experience with a faster feedback loop.
-
-Make sure to run the following command from your host system to start the docker compose stack as you cannot run docker within docker, so navigate to this folder within your host system and run the command:
+This repository is a plain Java library (see `AGENTS.md`), not a deployable Kestra plugin: it ships no task, no trigger, and no plugin jar, so there is no local Kestra instance to run or plugin folder to mount. Build and test it directly with Gradle from inside the devcontainer:
 
 ```bash
-$ docker compose down -v && docker compose up -d
+$ ./gradlew build
 ```
-
-From this point, you can start developing your plugin and every time you want it updated within Kestra, run the following command to build the plugin: `./gradlew shadowJar`.
-
-The resulting JAR file will be generated in the `build/libs` directory and should automatically get reflected inside the local Kestra instance. However, you will need to manually restart the Kestra container for the plugin to take effect after making changes so Kestra can reload the plugins. But this is still a much better and faster developer experience as you won't need to rebuild the image and create a new container each time you make any source code changes.
-
-You can now navigate to http://localhost:8080 and start using your custom plugin.
 
 `Tests`:
 
