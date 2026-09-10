@@ -1,5 +1,6 @@
 package io.kestra.plugin.elasticsearch.shared;
 
+import java.io.IOException;
 import java.net.URI;
 import java.security.KeyManagementException;
 import java.security.KeyStoreException;
@@ -16,6 +17,7 @@ import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpHost;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.hc.core5.ssl.SSLContexts;
+import org.apache.hc.core5.util.Timeout;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -50,6 +52,8 @@ public class ElasticsearchConnection {
     private static final String ACCEPT_HEADER = "Accept";
     private static final String CONTENT_TYPE_HEADER = "Content-Type";
     private static final String COMPATIBLE_MEDIA_TYPE = "application/vnd.elasticsearch+json; compatible-with=%d";
+    private static final Timeout DEFAULT_CONNECT_TIMEOUT = Timeout.ofSeconds(10);
+    private static final Timeout DEFAULT_RESPONSE_TIMEOUT = Timeout.ofSeconds(60);
 
     @Schema(
         title = "Elasticsearch hosts",
@@ -138,6 +142,12 @@ public class ElasticsearchConnection {
             }
         });
 
+        // connect timeout lives on ConnectionConfig (not RequestConfig#setConnectTimeout, deprecated since httpclient5 5.6)
+        builder.setConnectionConfigCallback(connectionConfigBuilder -> connectionConfigBuilder
+            .setConnectTimeout(DEFAULT_CONNECT_TIMEOUT));
+        builder.setRequestConfigCallback(requestConfigBuilder -> requestConfigBuilder
+            .setResponseTimeout(DEFAULT_RESPONSE_TIMEOUT));
+
         if (runContext.render(this.trustAllSsl).as(Boolean.class).orElse(false)) {
             runContext.logger().warn(
                 "`trustAllSsl` is enabled: TLS certificate and hostname verification are disabled for this Elasticsearch connection. " +
@@ -203,13 +213,26 @@ public class ElasticsearchConnection {
     }
 
     public ElasticsearchClient highLevelClient(RunContext runContext) throws IllegalVariableEvaluationException {
-        var lowLevelClient = client(runContext);
+        // validated before allocating the low-level client: it only needs runContext + targetServerVersion,
+        // so an out-of-range version fails fast instead of leaking a started async client (IO reactor + pool)
         var compatibleMediaType = this.compatibleMediaType(runContext);
-        var transportOptionsBuilder = new Rest5ClientOptions.Builder(RequestOptions.DEFAULT.toBuilder());
-        transportOptionsBuilder.setHeader(ACCEPT_HEADER, compatibleMediaType);
-        transportOptionsBuilder.setHeader(CONTENT_TYPE_HEADER, compatibleMediaType);
-        var transportOptions = transportOptionsBuilder.build();
-        var transport = new Rest5ClientTransport(lowLevelClient, new JacksonJsonpMapper(), transportOptions);
+        var lowLevelClient = client(runContext);
+
+        Rest5ClientTransport transport;
+        try {
+            var transportOptionsBuilder = new Rest5ClientOptions.Builder(RequestOptions.DEFAULT.toBuilder());
+            transportOptionsBuilder.setHeader(ACCEPT_HEADER, compatibleMediaType);
+            transportOptionsBuilder.setHeader(CONTENT_TYPE_HEADER, compatibleMediaType);
+            var transportOptions = transportOptionsBuilder.build();
+            transport = new Rest5ClientTransport(lowLevelClient, new JacksonJsonpMapper(), transportOptions);
+        } catch (RuntimeException e) {
+            try {
+                lowLevelClient.close();
+            } catch (IOException closeException) {
+                e.addSuppressed(closeException);
+            }
+            throw e;
+        }
 
         return new ElasticsearchClient(transport);
     }
@@ -220,6 +243,9 @@ public class ElasticsearchConnection {
             .map(s ->
             {
                 var uri = URI.create(s);
+                if (uri.getScheme() == null || uri.getHost() == null) {
+                    throw new IllegalArgumentException("Invalid Elasticsearch host `" + s + "`, expected a URI with a scheme, e.g. `https://host:9200`");
+                }
                 return new HttpHost(uri.getScheme(), uri.getHost(), uri.getPort());
             })
             .toArray(HttpHost[]::new);

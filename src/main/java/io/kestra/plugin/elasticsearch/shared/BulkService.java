@@ -23,6 +23,8 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
  * and {@code plugin-ee-elasticsearch} (EE, via {@code LogExporter}).
  */
 public class BulkService {
+    private static final int MAX_LOGGED_ERRORS = 20;
+
     private BulkService() {
     }
 
@@ -74,17 +76,29 @@ public class BulkService {
 
     private static String logError(BulkResponse bulkResponse) {
         StringBuilder builder = new StringBuilder();
+        var errorCount = new AtomicLong();
+        var loggedCount = new AtomicLong();
         bulkResponse.items().forEach(
             responseItem ->
             {
                 if (responseItem.error() != null) {
-                    builder
-                        .append(responseItem.index()).append(": ")
-                        .append(responseItem.status()).append(" - ")
-                        .append(responseItem.error().reason()).append('\n');
+                    errorCount.incrementAndGet();
+                    if (loggedCount.get() < MAX_LOGGED_ERRORS) {
+                        loggedCount.incrementAndGet();
+                        builder
+                            .append(responseItem.index()).append(": ")
+                            .append(responseItem.status()).append(" - ")
+                            .append(responseItem.error().reason()).append('\n');
+                    }
                 }
             }
         );
+
+        var omittedCount = errorCount.get() - loggedCount.get();
+        if (omittedCount > 0) {
+            builder.append("... (").append(omittedCount).append(" more errors omitted)\n");
+        }
+
         return builder.toString();
     }
 }

@@ -48,6 +48,7 @@
   - `ElasticsearchConnection` — hosts, basic auth, custom headers, TLS trust, path prefix, strict deprecation mode, and `targetServerVersion` compatibility headers.
   - `BulkService` — buffered bulk indexing (`executeBulk`) with `requests.count`, `records`, and `requests.duration` metrics.
 - Consumed by `plugin-elasticsearch` (OSS) and `plugin-ee-elasticsearch` (EE) only — see `AGENTS.md` for the contribution rules.
+- The published POM declares only the two Elasticsearch artifacts as `api` dependencies; `kestra-core`, `slf4j`, `reactor`, `httpclient5`, `httpcore5`, `swagger-annotations`, and `jakarta.validation` are all `compileOnly` and intentionally not published transitively. This library is therefore only usable inside a Kestra plugin build that already provides those on its compile/runtime classpath — its Maven Central coordinates do not make it a standalone dependency.
 
 ## Documentation
 * Full documentation can be found under: [kestra.io/docs](https://kestra.io/docs)

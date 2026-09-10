@@ -19,6 +19,7 @@ import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -63,7 +64,21 @@ class TargetServerVersionRegressionTest {
             var allMessages = allExceptionMessages(exception);
             assertThat(allMessages, containsString("media_type_header_exception"));
             assertThat(allMessages, containsString("Invalid media-type value on headers"));
+            assertThat(allMessages, containsString("Accept"));
+            assertThat(allMessages, containsString("Content-Type"));
         }
+    }
+
+    @Test
+    void shouldRejectOutOfRangeTargetServerVersionOnHighLevelClient() {
+        var runContext = runContextFactory.of();
+        var connection = ElasticsearchConnection.builder()
+            .hosts(List.of("http://localhost:9200"))
+            .targetServerVersion(Property.ofValue(7))
+            .build();
+
+        var exception = assertThrows(IllegalArgumentException.class, () -> connection.highLevelClient(runContext));
+        assertThat(exception.getMessage(), is("`targetServerVersion` must be 8 or 9"));
     }
 
     private String allExceptionMessages(Throwable throwable) {

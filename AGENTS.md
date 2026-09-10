@@ -13,7 +13,7 @@
 
 - This library is shared between OSS and EE **only** — it is not a general-purpose Elasticsearch client wrapper. Do not add task/trigger classes, plugin docs, or plugin icons here; each consumer keeps its own.
 - It is a plain library, not a plugin: no `package-info.java` with `@PluginSubGroup`, no `shadowJar`, no `X-Kestra-*` jar manifest.
-- Keep the ES client version (`elasticsearchVersion` in `gradle.properties`) in lockstep across both consumers — a version drift between OSS and EE would make the `connection` schema diverge between the two task groups.
+- This library is the single source of the ES client version (`elasticsearchVersion` in its own `gradle.properties`); neither consumer declares it anymore. Both inherit it transitively through the `api` dependency, so bumping it here changes the `connection` schema for OSS and EE simultaneously — bump deliberately and QA both.
 - Preserve metric names (`requests.count`, `records`, `requests.duration`) and error message text byte-for-byte; both consumers' users template outputs and grep logs on these.
 
 ## References

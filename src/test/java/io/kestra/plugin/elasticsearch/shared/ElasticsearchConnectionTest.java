@@ -77,4 +77,15 @@ class ElasticsearchConnectionTest {
         var exception = assertThrows(IllegalArgumentException.class, () -> connection.client(runContext));
         assertThat(exception.getMessage(), containsString("Invalid header format, expected `Name: Value` but got `NoColonHere`"));
     }
+
+    @Test
+    void shouldRejectHostWithoutScheme() {
+        var runContext = runContextFactory.of();
+        var connection = ElasticsearchConnection.builder()
+            .hosts(List.of("localhost:9200"))
+            .build();
+
+        var exception = assertThrows(IllegalArgumentException.class, () -> connection.client(runContext));
+        assertThat(exception.getMessage(), containsString("expected a URI with a scheme"));
+    }
 }
