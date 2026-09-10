@@ -5,6 +5,7 @@ import java.net.URI;
 import java.security.KeyManagementException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.util.List;
 
 import org.apache.hc.client5.http.auth.AuthScope;
@@ -52,8 +53,6 @@ public class ElasticsearchConnection {
     private static final String ACCEPT_HEADER = "Accept";
     private static final String CONTENT_TYPE_HEADER = "Content-Type";
     private static final String COMPATIBLE_MEDIA_TYPE = "application/vnd.elasticsearch+json; compatible-with=%d";
-    private static final Timeout DEFAULT_CONNECT_TIMEOUT = Timeout.ofSeconds(10);
-    private static final Timeout DEFAULT_RESPONSE_TIMEOUT = Timeout.ofSeconds(60);
 
     @Schema(
         title = "Elasticsearch hosts",
@@ -110,6 +109,23 @@ public class ElasticsearchConnection {
     @PluginProperty(group = "advanced")
     private Property<Integer> targetServerVersion = Property.ofValue(DEFAULT_TARGET_SERVER_VERSION);
 
+    @Schema(
+        title = "Connection timeout",
+        description = "Maximum time to wait to establish the TCP connection to an Elasticsearch host. " +
+            "When unset, the Elasticsearch client default applies (1 second). A value of `PT0S` means no timeout."
+    )
+    @PluginProperty(group = "advanced")
+    private Property<Duration> connectTimeout;
+
+    @Schema(
+        title = "Response timeout",
+        description = "Maximum time to wait for a response once the request has been sent. " +
+            "When unset, the Elasticsearch client default applies (unbounded), so large bulk requests are not cut off. " +
+            "A value of `PT0S` means no timeout. Set a bound (e.g. `PT60S`) to protect against a hung cluster."
+    )
+    @PluginProperty(group = "advanced")
+    private Property<Duration> responseTimeout;
+
     @SuperBuilder
     @NoArgsConstructor
     @Getter
@@ -143,10 +159,20 @@ public class ElasticsearchConnection {
         });
 
         // connect timeout lives on ConnectionConfig (not RequestConfig#setConnectTimeout, deprecated since httpclient5 5.6)
-        builder.setConnectionConfigCallback(connectionConfigBuilder -> connectionConfigBuilder
-            .setConnectTimeout(DEFAULT_CONNECT_TIMEOUT));
-        builder.setRequestConfigCallback(requestConfigBuilder -> requestConfigBuilder
-            .setResponseTimeout(DEFAULT_RESPONSE_TIMEOUT));
+        // left unset, the Rest5ClientBuilder native default applies (connect = 1s, response = unbounded) — no override here would be a silent behavior change
+        var rConnectTimeout = runContext.render(this.connectTimeout).as(Duration.class);
+        if (rConnectTimeout.isPresent()) {
+            var connectTimeout = Timeout.of(rConnectTimeout.get());
+            builder.setConnectionConfigCallback(connectionConfigBuilder -> connectionConfigBuilder
+                .setConnectTimeout(connectTimeout));
+        }
+
+        var rResponseTimeout = runContext.render(this.responseTimeout).as(Duration.class);
+        if (rResponseTimeout.isPresent()) {
+            var responseTimeout = Timeout.of(rResponseTimeout.get());
+            builder.setRequestConfigCallback(requestConfigBuilder -> requestConfigBuilder
+                .setResponseTimeout(responseTimeout));
+        }
 
         if (runContext.render(this.trustAllSsl).as(Boolean.class).orElse(false)) {
             runContext.logger().warn(
