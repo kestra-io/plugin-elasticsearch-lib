@@ -155,7 +155,7 @@ public class ElasticsearchConnection {
             httpClientBuilder.setUserAgent("Kestra/" + runContext.version());
             // head of the chain: every available() call from the HTTP/1.1 and HTTP/2 handlers goes through the wrapper
             httpClientBuilder.addExecInterceptorFirst(NullSafeEntityProducer.class.getSimpleName(), (request, entityProducer, scope, chain, callback) ->
-                chain.proceed(request, entityProducer == null ? null : new NullSafeEntityProducer(entityProducer), scope, callback)
+                chain.proceed(request, entityProducer == null ? null : new NullSafeEntityProducer(entityProducer, runContext.logger()), scope, callback)
             );
             if (credentialsProvider != null) {
                 httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider);

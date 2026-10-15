@@ -10,17 +10,24 @@ import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.nio.AsyncEntityProducer;
 import org.apache.hc.core5.http.nio.DataStreamChannel;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 class NullSafeEntityProducerTest {
     @Test
     void shouldReportNothingAvailableOnceBodyIsFullySent() throws Exception {
         var entity = multiBufferEntity("{\"index\":{}}\n", "{\"a\":1}\n");
-        var producer = new NullSafeEntityProducer(entity);
+        var logger = mock(Logger.class);
+        var producer = new NullSafeEntityProducer(entity, logger);
 
         assertThat(producer.available(), is(greaterThan(0)));
 
@@ -31,6 +38,8 @@ class NullSafeEntityProducerTest {
 
         assertThrows(NullPointerException.class, entity::available);
         assertThat(producer.available(), is(0));
+        assertThat(producer.available(), is(0));
+        verify(logger, times(1)).warn(anyString(), any(NullPointerException.class));
 
         producer.releaseResources();
         assertThat(producer.available(), is(greaterThan(0)));
