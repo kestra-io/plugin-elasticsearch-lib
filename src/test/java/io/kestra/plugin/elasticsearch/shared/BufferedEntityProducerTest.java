@@ -11,10 +11,11 @@ import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.nio.AsyncEntityProducer;
 import org.apache.hc.core5.http.nio.DataStreamChannel;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -45,11 +46,14 @@ class BufferedEntityProducerTest {
     }
 
     @Test
+    @Timeout(5)
     void shouldFailWhenProducerNeverMakesProgress() {
         var stalled = mock(AsyncEntityProducer.class);
         when(stalled.getContentEncoding()).thenReturn(null);
 
-        assertThrows(IllegalStateException.class, () -> BufferedEntityProducer.of(stalled));
+        var exception = assertThrows(IllegalStateException.class, () -> BufferedEntityProducer.of(stalled));
+
+        assertThat(exception.getMessage(), containsString("no progress"));
     }
 
     @Test

@@ -1,8 +1,8 @@
 package io.kestra.plugin.elasticsearch.shared;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hc.core5.http.ContentType;
@@ -21,12 +21,6 @@ final class BufferedEntityProducer {
     private BufferedEntityProducer() {
     }
 
-    /**
-     * Reads the whole body through {@code produce()} and releases the original producer.
-     * Content-encoded producers are returned unchanged.
-     *
-     * @throws IllegalStateException if the body is empty or the producer stops making progress
-     */
     static AsyncEntityProducer of(AsyncEntityProducer original) throws IOException {
         if (original.getContentEncoding() != null) {
             return original;
@@ -35,10 +29,10 @@ final class BufferedEntityProducer {
         var channel = new CollectingChannel();
         var idleCalls = 0;
         while (!channel.ended) {
-            var before = channel.body.size();
+            var before = channel.size;
             original.produce(channel);
-            idleCalls = channel.body.size() == before ? idleCalls + 1 : 0;
-            if (idleCalls > MAX_IDLE_PRODUCE_CALLS) {
+            idleCalls = channel.size == before ? idleCalls + 1 : 0;
+            if (idleCalls >= MAX_IDLE_PRODUCE_CALLS) {
                 throw new IllegalStateException(
                     "The request body producer made no progress after %d consecutive attempts, so the request was not sent.".formatted(MAX_IDLE_PRODUCE_CALLS)
                 );
@@ -46,16 +40,17 @@ final class BufferedEntityProducer {
         }
         original.releaseResources();
 
-        if (channel.body.size() == 0) {
+        if (channel.size == 0) {
             throw new IllegalStateException("The request body was empty, so the request was not sent.");
         }
 
         var contentType = original.getContentType() == null ? ContentType.APPLICATION_JSON : ContentType.parse(original.getContentType());
-        return new BasicAsyncEntityProducer(channel.body.toByteArray(), contentType);
+        return new BasicAsyncEntityProducer(channel.toByteArray(), contentType);
     }
 
     private static final class CollectingChannel implements DataStreamChannel {
-        private final ByteArrayOutputStream body = new ByteArrayOutputStream();
+        private final List<ByteBuffer> chunks = new ArrayList<>();
+        private int size;
         private boolean ended;
 
         @Override
@@ -65,10 +60,20 @@ final class BufferedEntityProducer {
         @Override
         public int write(ByteBuffer src) {
             var written = src.remaining();
-            var chunk = new byte[written];
-            src.get(chunk);
-            body.write(chunk, 0, written);
+            chunks.add(ByteBuffer.allocate(written).put(src).flip());
+            size += written;
             return written;
+        }
+
+        private byte[] toByteArray() {
+            var body = new byte[size];
+            var offset = 0;
+            for (var chunk : chunks) {
+                var length = chunk.remaining();
+                chunk.get(body, offset, length);
+                offset += length;
+            }
+            return body;
         }
 
         @Override

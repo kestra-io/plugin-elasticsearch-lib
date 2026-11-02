@@ -153,7 +153,7 @@ public class ElasticsearchConnection {
         builder.setHttpClientConfigCallback(httpClientBuilder ->
         {
             httpClientBuilder.setUserAgent("Kestra/" + runContext.version());
-            // head of the chain, so every retry, auth challenge and failover resend goes through a freshly buffered body
+            // first in the chain, so the retry, auth and redirect execs below only ever resend the repeatable buffered copy
             httpClientBuilder.addExecInterceptorFirst(BufferedEntityProducer.class.getSimpleName(), (request, entityProducer, scope, chain, callback) ->
                 chain.proceed(request, entityProducer == null ? null : BufferedEntityProducer.of(entityProducer), scope, callback)
             );
