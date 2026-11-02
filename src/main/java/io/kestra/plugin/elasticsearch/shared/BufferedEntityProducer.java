@@ -34,14 +34,14 @@ final class BufferedEntityProducer {
             idleCalls = channel.size == before ? idleCalls + 1 : 0;
             if (idleCalls >= MAX_IDLE_PRODUCE_CALLS) {
                 throw new IllegalStateException(
-                    "The request body producer made no progress after %d consecutive attempts, so the request was not sent.".formatted(MAX_IDLE_PRODUCE_CALLS)
+                    "The request body producer made no progress after %d consecutive attempts, so the request was not sent. Retry the task, and report it to the plugin maintainers if it keeps happening.".formatted(MAX_IDLE_PRODUCE_CALLS)
                 );
             }
         }
         original.releaseResources();
 
         if (channel.size == 0) {
-            throw new IllegalStateException("The request body was empty, so the request was not sent.");
+            throw new IllegalStateException("The request body was empty, so the request was not sent. Retry the task, and report it to the plugin maintainers if it keeps happening.");
         }
 
         var contentType = original.getContentType() == null ? ContentType.APPLICATION_JSON : ContentType.parse(original.getContentType());
